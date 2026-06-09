@@ -1,0 +1,37 @@
+[
+  {
+    "time": "2026-06-09 14:16:13",
+    "program": "LD X0\nOR Y0\nANI X1\nOUT Y0\nLD X2\nOUT Y0\nEND",
+    "io_desc": "",
+    "type": "AI诊断",
+    "result": "1. 注意程序中Y0被两个OUT指令赋值：先由第一段OUT Y0控制，再由第二段OUT Y0改写。  \n2. 检查PLC扫描顺序：最后一个OUT指令会覆盖前面的结果，导致第一段逻辑失效。  \n3. 观察X2的状态变化，若X2为ON，Y0将强制为ON，忽略X1的互锁。  \n4. 建议考虑合并逻辑，或使用SET/RST指令避免双线圈冲突。"
+  },
+  {
+    "time": "2026-06-09 14:28:15",
+    "program": "LD X0\nOR Y0\nANI X1\nOUT Y0\nLD X2",
+    "io_desc": "",
+    "type": "AI诊断",
+    "result": ""
+  },
+  {
+    "time": "2026-06-09 14:29:10",
+    "program": "LD X0\nOR Y0\nANI X1\nOUT Y0\nLD X2",
+    "io_desc": "",
+    "type": "规则检查",
+    "result": "✅ 未发现常见基础错误（规则检查）。"
+  },
+  {
+    "time": "2026-06-09 14:31:58",
+    "program": "LD X0\nOR Y0\nANI X1\nOUT Y0\nLD X2",
+    "io_desc": "",
+    "type": "AI诊断",
+    "result": "1. 先检查指令表是否完整：LD X2后缺少输出或分支，可能导致程序逻辑中断，检查是否有遗漏。\n2. 观察X0和X1的输入状态：Y0输出需X0为ON或Y0自锁，同时X1必须为OFF。用监控软件查看各触点通断。\n3. 若Y0不输出，注意自锁回路：只靠OR Y0，没有其他保持条件，可能因扫描周期"
+  },
+  {
+    "time": "2026-06-09 14:36:44",
+    "program": "LD X0\nOR Y0\nANI X1\nOUT Y0\nLD X2\nOUT Y0\nEND",
+    "io_desc": "",
+    "type": "规则检查",
+    "result": "⚠️ 发现以下问题：\n- 双线圈警告：软元件 Y0 被输出了 2 次，可能造成逻辑混乱。"
+  }
+]
