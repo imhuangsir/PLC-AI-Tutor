@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import altair as alt
 
-# ================== Supabase 配置 ==================
+# ================== Supabase 配置（建议改用 st.secrets） ==================
 SUPABASE_URL = "https://iacgpiciqwreyaylxxmf.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhY2dwaWNpcXdyZXlheWx4eG1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODY3OTQsImV4cCI6MjA5NjU2Mjc5NH0.tS4m3l8EdzrJb05m6OfLMMRdG2YeGvHyJPS9NIcETFM"
 
@@ -40,7 +40,7 @@ def supabase_request(method, endpoint, payload=None):
         st.error(f"请求失败: {e}")
         raise e
 
-# ================== 缓存数据 ==================
+# ================== 一次性获取所有平台数据（缓存） ==================
 @st.cache_data(ttl=30, show_spinner=False)
 def get_all_platform_data():
     endpoint = "student_logs?select=student_name,time,type,result"
@@ -57,7 +57,7 @@ def format_time(iso_time):
     except:
         return iso_time[:19] if len(iso_time) >= 19 else iso_time
 
-# ================== 统计函数 ==================
+# ================== 基于缓存数据的统计函数 ==================
 def get_global_stats():
     data = get_all_platform_data()
     total_ops = len(data)
@@ -101,6 +101,7 @@ def get_latest_activity():
     formatted_time = format_time(raw_time)
     return student, formatted_time
 
+# ================== 其他数据库操作 ==================
 def load_log(student_name):
     endpoint = f"student_logs?student_name=eq.{student_name}&order=time.asc"
     try:
@@ -351,7 +352,7 @@ def generate_report(student_name, log):
         else:
             st.info("暂无规则错误统计。")
 
-        # ========== 进步趋势（修复横轴刻度为整数） ==========
+        # ========== 进步趋势（综合评分，所有规则检查，横轴整数水平标签） ==========
         st.markdown("### 📉 进步趋势")
         rule_checks_all = [r for r in log if r["type"] == "规则检查"]
         if len(rule_checks_all) >= 2:
@@ -364,9 +365,11 @@ def generate_report(student_name, log):
                 score = max(0, 100 - warn_count * 20)
                 trend_data.append({"操作序号": idx + 1, "综合评分": score})
             df_trend = pd.DataFrame(trend_data)
-            # 强制横轴为有序分类，刻度为整数
+            df_trend["操作序号"] = df_trend["操作序号"].astype(int)
             line = alt.Chart(df_trend).mark_line(point=True).encode(
-                x=alt.X("操作序号:O", scale=alt.Scale(domain=list(range(1, df_trend["操作序号"].max()+1))), title="操作序号"),
+                x=alt.X("操作序号:Q",
+                        scale=alt.Scale(domain=(1, df_trend["操作序号"].max())),
+                        axis=alt.Axis(title="操作序号", labelAngle=0, tickMinStep=1, format="d")),
                 y=alt.Y("综合评分:Q", scale=alt.Scale(domain=(0, 100)), title="综合评分"),
                 tooltip=["操作序号", "综合评分"]
             ).properties(height=300, title="综合评分趋势（满分100，每警告扣20分）")
