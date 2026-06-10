@@ -352,28 +352,28 @@ def generate_report(student_name, log):
         else:
             st.info("暂无规则错误统计。")
 
-        # ========== 进步趋势（综合评分折线图） ==========
+        # ========== 进步趋势（综合评分，统计所有规则检查） ==========
         st.markdown("### 📉 进步趋势")
-        if len(log) >= 3:
+        rule_checks_all = [r for r in log if r["type"] == "规则检查"]
+        if len(rule_checks_all) >= 2:
             trend_data = []
-            for idx, r in enumerate(log):
-                if r["type"] == "规则检查" and "⚠️" in r["result"]:
+            for idx, r in enumerate(rule_checks_all):
+                if "⚠️" in r["result"]:
                     warn_count = r["result"].count("- ")
-                    score = max(0, 100 - warn_count * 20)
-                    trend_data.append({"操作序号": idx + 1, "综合评分": score})
-            if len(trend_data) >= 2:
-                df_trend = pd.DataFrame(trend_data)
-                line = alt.Chart(df_trend).mark_line(point=True).encode(
-                    x=alt.X("操作序号:Q", scale=alt.Scale(domain=(1, df_trend["操作序号"].max())), title="操作序号"),
-                    y=alt.Y("综合评分:Q", scale=alt.Scale(domain=(0, 100)), title="综合评分"),
-                    tooltip=["操作序号", "综合评分"]
-                ).properties(height=300, title="综合评分趋势（满分100，每警告扣20分）")
-                st.altair_chart(line, use_container_width=True)
-                st.caption("分数越高代表越少警告，表示进步。")
-            else:
-                st.info("至少需要2次规则检查记录才能显示评分趋势。")
+                else:
+                    warn_count = 0
+                score = max(0, 100 - warn_count * 20)
+                trend_data.append({"操作序号": idx + 1, "综合评分": score})
+            df_trend = pd.DataFrame(trend_data)
+            line = alt.Chart(df_trend).mark_line(point=True).encode(
+                x=alt.X("操作序号:Q", scale=alt.Scale(domain=(1, df_trend["操作序号"].max())), title="操作序号"),
+                y=alt.Y("综合评分:Q", scale=alt.Scale(domain=(0, 100)), title="综合评分"),
+                tooltip=["操作序号", "综合评分"]
+            ).properties(height=300, title="综合评分趋势（满分100，每警告扣20分）")
+            st.altair_chart(line, use_container_width=True)
+            st.caption("分数越高代表越少警告，表示进步。")
         else:
-            st.info("至少需要3次有效操作才能显示进步趋势。")
+            st.info("至少需要2次规则检查记录才能显示评分趋势。")
 
     with right_col:
         st.markdown("### 👥 学生快速切换")
