@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import altair as alt
 
-# ================== Supabase 配置 ==================
+# ================== Supabase 配置（建议改用 st.secrets） ==================
 SUPABASE_URL = "https://iacgpiciqwreyaylxxmf.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhY2dwaWNpcXdyZXlheWx4eG1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODY3OTQsImV4cCI6MjA5NjU2Mjc5NH0.tS4m3l8EdzrJb05m6OfLMMRdG2YeGvHyJPS9NIcETFM"
 
@@ -43,7 +43,6 @@ def supabase_request(method, endpoint, payload=None):
 # ================== 一次性获取所有平台数据（缓存） ==================
 @st.cache_data(ttl=30, show_spinner=False)
 def get_all_platform_data():
-    """返回所有学生的记录列表（仅包含必要字段）"""
     endpoint = "student_logs?select=student_name,time,type,result"
     try:
         data = supabase_request("GET", endpoint)
@@ -52,14 +51,13 @@ def get_all_platform_data():
         return []
 
 def format_time(iso_time):
-    """将 ISO 8601 时间转为本地可读格式"""
     try:
         dt = datetime.fromisoformat(iso_time.replace('Z', '+00:00'))
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
         return iso_time[:19] if len(iso_time) >= 19 else iso_time
 
-# ================== 基于缓存数据的统计函数（避免重复请求） ==================
+# ================== 基于缓存数据的统计函数 ==================
 def get_global_stats():
     data = get_all_platform_data()
     total_ops = len(data)
@@ -87,7 +85,9 @@ def get_student_activity():
     for r in data:
         name = r.get("student_name")
         if name:
-            activity[name] = activity.get(name, 0) + 1
+            chinese_name = re.search(r'[\u4e00-\u9fff]+$', name)
+            display_name = chinese_name.group(0) if chinese_name else name
+            activity[display_name] = activity.get(display_name, 0) + 1
     df = pd.DataFrame(list(activity.items()), columns=["学生", "操作次数"])
     return df.sort_values("操作次数", ascending=False) if not df.empty else pd.DataFrame(columns=["学生", "操作次数"])
 
@@ -95,19 +95,17 @@ def get_latest_activity():
     data = get_all_platform_data()
     if not data:
         return None, None
-    # 按 time 降序排序（time 是 ISO 字符串，可直接比较）
     latest = max(data, key=lambda x: x.get("time", ""))
     student = latest.get("student_name")
     raw_time = latest.get("time", "")
     formatted_time = format_time(raw_time)
     return student, formatted_time
 
-# ================== 其他数据库操作（不缓存，针对单个学生） ==================
+# ================== 其他数据库操作 ==================
 def load_log(student_name):
     endpoint = f"student_logs?student_name=eq.{student_name}&order=time.asc"
     try:
         data = supabase_request("GET", endpoint)
-        # 格式化每条记录的时间，用于显示
         for r in data:
             if "time" in r:
                 r["time"] = format_time(r["time"])
@@ -126,7 +124,6 @@ def save_log(student_name, log_entry):
     }
     try:
         supabase_request("POST", "student_logs", record)
-        # 清除缓存，因为数据已变化
         st.cache_data.clear()
     except Exception as e:
         st.error(f"保存记录失败：{e}")
@@ -144,7 +141,7 @@ def get_all_students():
     students = list(set([r.get("student_name") for r in data if r.get("student_name")]))
     return students
 
-# ================== 规则检查和 AI 诊断（保持不变） ==================
+# ================== 规则检查 ==================
 def rule_based_check(instruction_text):
     warnings = []
     out_devices = re.findall(r'OUT\s+(\w+)', instruction_text, re.IGNORECASE)
@@ -281,7 +278,7 @@ def show_learning_resources(warnings):
             - **模块化编程**：将复杂逻辑拆分为子程序
             """)
 
-# ================== 学情报告（使用缓存数据，不再重复请求） ==================
+# ================== 学情报告 ==================
 def generate_report(student_name, log):
     st.subheader(f"📋 {student_name} 的学情分析报告")
     if not log:
@@ -355,16 +352,28 @@ def generate_report(student_name, log):
         else:
             st.info("暂无规则错误统计。")
 
+        # ========== 进步趋势（综合评分折线图） ==========
         st.markdown("### 📉 进步趋势")
         if len(log) >= 3:
             trend_data = []
-            for i, r in enumerate(log):
-                w = r["result"].count("- ") if "⚠️" in r["result"] else 0
-                trend_data.append({"操作序号": i+1, "警告数": w})
-            df_trend = pd.DataFrame(trend_data)
-            st.line_chart(df_trend.set_index("操作序号"), use_container_width=True)
+            for idx, r in enumerate(log):
+                if r["type"] == "规则检查" and "⚠️" in r["result"]:
+                    warn_count = r["result"].count("- ")
+                    score = max(0, 100 - warn_count * 20)
+                    trend_data.append({"操作序号": idx + 1, "综合评分": score})
+            if len(trend_data) >= 2:
+                df_trend = pd.DataFrame(trend_data)
+                line = alt.Chart(df_trend).mark_line(point=True).encode(
+                    x=alt.X("操作序号:Q", scale=alt.Scale(domain=(1, df_trend["操作序号"].max())), title="操作序号"),
+                    y=alt.Y("综合评分:Q", scale=alt.Scale(domain=(0, 100)), title="综合评分"),
+                    tooltip=["操作序号", "综合评分"]
+                ).properties(height=300, title="综合评分趋势（满分100，每警告扣20分）")
+                st.altair_chart(line, use_container_width=True)
+                st.caption("分数越高代表越少警告，表示进步。")
+            else:
+                st.info("至少需要2次规则检查记录才能显示评分趋势。")
         else:
-            st.info("多次操作后将显示进步趋势曲线。")
+            st.info("至少需要3次有效操作才能显示进步趋势。")
 
     with right_col:
         st.markdown("### 👥 学生快速切换")
@@ -382,7 +391,6 @@ def generate_report(student_name, log):
         else:
             st.info("暂无其他学生记录。")
 
-        # 以下统计均使用缓存数据，不再单独请求
         st.markdown("### 📊 全平台统计")
         global_stats = get_global_stats()
         col_g1, col_g2, col_g3 = st.columns(3)
@@ -401,8 +409,8 @@ def generate_report(student_name, log):
         activity_df = get_student_activity()
         if not activity_df.empty:
             bars = alt.Chart(activity_df).mark_bar(size=20).encode(
-                x=alt.X("学生:N", sort=None),
-                y=alt.Y("操作次数:Q"),
+                x=alt.X("学生:N", sort=None, axis=alt.Axis(labelAngle=0, title="学生")),
+                y=alt.Y("操作次数:Q", title="操作次数"),
                 tooltip=["学生", "操作次数"]
             ).properties(height=300).interactive()
             st.altair_chart(bars, use_container_width=True)
@@ -532,7 +540,6 @@ def main_page():
                 show_learning_resources(warnings)
             else:
                 show_learning_resources(["通用"])
-            # 保存记录
             record = {
                 "program": instruction_input,
                 "io_desc": io_description,
