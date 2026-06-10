@@ -53,15 +53,12 @@ def get_all_platform_data():
 def format_time(iso_time):
     """将 UTC 时间（ISO字符串）转换为北京时间（UTC+8）并格式化为本地时间"""
     try:
-        # 处理可能缺失时区信息的情况
         if iso_time.endswith('Z'):
             iso_time = iso_time[:-1] + '+00:00'
         dt = datetime.fromisoformat(iso_time)
-        # 转换为北京时间 (UTC+8)
         dt_beijing = dt + timedelta(hours=8)
         return dt_beijing.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
-        # 如果解析失败，返回原字符串的前19位
         return iso_time[:19] if len(iso_time) >= 19 else iso_time
 
 # ================== 基于缓存数据的统计函数 ==================
@@ -121,10 +118,9 @@ def load_log(student_name):
         return []
 
 def save_log(student_name, log_entry):
-    # 存储 UTC 时间，不带时区偏移但用 Z 表示
     record = {
         "student_name": student_name,
-        "time": datetime.utcnow().isoformat() + "Z",  # UTC 时间
+        "time": datetime.utcnow().isoformat() + "Z",
         "program": log_entry.get("program", ""),
         "io_desc": log_entry.get("io_desc", ""),
         "type": log_entry["type"],
@@ -360,7 +356,7 @@ def generate_report(student_name, log):
         else:
             st.info("暂无规则错误统计。")
 
-        # ========== 进步趋势 ==========
+        # ========== 进步趋势（综合评分，所有规则检查，强制整数刻度） ==========
         st.markdown("### 📉 进步趋势")
         rule_checks_all = [r for r in log if r["type"] == "规则检查"]
         if len(rule_checks_all) >= 2:
@@ -374,10 +370,14 @@ def generate_report(student_name, log):
                 trend_data.append({"操作序号": idx + 1, "综合评分": score})
             df_trend = pd.DataFrame(trend_data)
             df_trend["操作序号"] = df_trend["操作序号"].astype(int)
+            # 强制 x 轴显示所有整数刻度
+            max_seq = df_trend["操作序号"].max()
             line = alt.Chart(df_trend).mark_line(point=True).encode(
                 x=alt.X("操作序号:Q",
-                        scale=alt.Scale(domain=(1, df_trend["操作序号"].max())),
-                        axis=alt.Axis(title="操作序号", labelAngle=0, tickMinStep=1, format="d")),
+                        scale=alt.Scale(domain=(1, max_seq)),
+                        axis=alt.Axis(title="操作序号", labelAngle=0,
+                                      values=list(range(1, max_seq + 1)),
+                                      format="d")),
                 y=alt.Y("综合评分:Q", scale=alt.Scale(domain=(0, 100)), title="综合评分"),
                 tooltip=["操作序号", "综合评分"]
             ).properties(height=300, title="综合评分趋势（满分100，每警告扣20分）")
