@@ -8,18 +8,18 @@ import pandas as pd
 import altair as alt
 
 # ================== Supabase 配置（建议改用 st.secrets） ==================
-SUPABASE_URL = "https://iacgpiciqwreyaylxxmf.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhY2dwaWNpcXdyZXlheWx4eG1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODY3OTQsImV4cCI6MjA5NjU2Mjc5NH0.tS4m3l8EdzrJb05m6OfLMMRdG2YeGvHyJPS9NIcETFM"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # ================== 页面配置 ==================
 st.set_page_config(page_title="AI故障导师", layout="wide")
 
 # ================== AI 配置 ==================
-AI_API_KEY = "sk-ZzoqSJIZWpA6sczyjZMXJoSupG3luegm"
+AI_API_KEY = st.secrets["AI_API_KEY"]
 AI_API_URL = "https://token.sensenova.cn/v1/chat/completions"
 AI_MODEL = "deepseek-v4-flash"
 
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "职业教育前沿课程设计"
 
 # ================== Supabase 请求函数 ==================
 def supabase_request(method, endpoint, payload=None):
@@ -447,7 +447,7 @@ def admin_page():
         st.session_state.admin_authed = False
 
     if not st.session_state.admin_authed:
-        pwd = st.text_input("请输入管理员密码", type="password")
+        pwd = st.text_input("请输入管理员密码（默认密码：职业教育前沿课程设计）", type="password")
         if st.button("进入后台"):
             if pwd == ADMIN_PASSWORD:
                 st.session_state.admin_authed = True
