@@ -1,0 +1,26 @@
+name: Keep App Awake
+
+on:
+  schedule:
+    # 每 10 小时运行一次（UTC 时间 0:10, 10:10, 20:10）
+    - cron: '10 */10 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Make a trivial change to keep the repo active
+        run: |
+          echo "Last kept alive on $(date)" > .github/keep-awake-timestamp.txt
+
+      - name: Commit and push if there are changes
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keep-awake-timestamp.txt
+          git diff --staged --quiet || git commit -m "chore: keep the streamlit app awake"
+          git push
