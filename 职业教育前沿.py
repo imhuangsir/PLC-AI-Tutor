@@ -16,8 +16,8 @@ st.set_page_config(page_title="AI故障导师", layout="wide")
 
 # ================== AI 配置 ==================
 AI_API_KEY = st.secrets["AI_API_KEY"]
-AI_API_URL = "https://token.sensenova.cn/v1/chat/completions"
-AI_MODEL = "deepseek-v4-flash"
+AI_API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+AI_MODEL = "deepseek-v4-pro"
 
 ADMIN_PASSWORD = "职业教育前沿课程设计"
 
